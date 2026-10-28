@@ -5,6 +5,7 @@ import { useCache } from '@/utils/useCache'
 import { i18n } from '@/i18n'
 import { store } from './index'
 import { getCurrentRouter, getQueryString, getSQLBotAddr, isPlatform } from '@/utils/utils'
+import { PORTAL_LOGOUT_URL, clearPortalSession, isPortalSession } from '@/utils/portal'
 
 const { wsCache } = useCache()
 
@@ -84,6 +85,8 @@ export const UserStore = defineStore('user', {
     async login(formData: { username: string; password: string }) {
       const res: any = await AuthApi.login(formData)
       if (res.access_token) {
+        // A local password login is not a LangBot application-center session.
+        clearPortalSession()
         this.setToken(res.access_token)
       }
       return res
@@ -96,6 +99,13 @@ export const UserStore = defineStore('user', {
       }
       const res: any = await AuthApi.logout(param)
       this.clear()
+      // Session opened from the LangBot application center: leave through the
+      // shared login screen so LangBot's own credentials are cleared as well.
+      if (isPortalSession()) {
+        clearPortalSession()
+        window.location.href = PORTAL_LOGOUT_URL
+        return PORTAL_LOGOUT_URL
+      }
       if (res) {
         window.location.href = res
         window.open(res, '_self')

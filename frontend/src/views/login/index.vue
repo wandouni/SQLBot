@@ -105,6 +105,7 @@ import loginImage from '@/assets/blue/login-image_blue.png'
 import Handler from './xpack/Handler.vue'
 import InitialPwdDialog from './InitialPwdDialog.vue'
 import { toLoginSuccess } from '@/utils/utils'
+import { markPortalSession } from '@/utils/portal'
 import elementResizeDetectorMaker from 'element-resize-detector'
 
 const showLoading = ref(true)
@@ -158,6 +159,8 @@ const exchangeSsoTicket = async (ticket: string) => {
       throw new Error('missing access token')
     }
     userStore.setToken(res.access_token)
+    // Logging out later must end the LangBot session too.
+    markPortalSession()
     toLoginSuccess(router)
   } catch {
     ssoFailed.value = true

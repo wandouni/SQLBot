@@ -21,6 +21,10 @@ services:
       DEFAULT_PWD: "SQLBot@123456"
       # MCP settings
       SERVER_IMAGE_HOST: http://YOUR_SERVE_IP:MCP_PORT/images/
+      # Full public SSE URL written into exported MCP configs, e.g.
+      # https://sqlbot.example.com/mcp. Leave unset to derive
+      # <request host>:8001/mcp. Set it explicitly behind a reverse proxy.
+      # MCP_PUBLIC_URL: ""
       # Auth & Security
       SECRET_KEY: ${SECRET_KEY:?Set a unique SECRET_KEY in .env before starting SQLBot}
       # CORS settings

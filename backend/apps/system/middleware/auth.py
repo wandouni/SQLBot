@@ -107,8 +107,13 @@ class TokenMiddleware(BaseHTTPMiddleware):
             payload = jwt.decode(
                 param, options={"verify_signature": False, "verify_exp": False}, algorithms=[security.ALGORITHM]
             )
+            # Scoped MCP tokens are signed with an API key secret and only valid
+            # on the standalone MCP endpoint. Never accept them as API keys.
+            if payload.get('scope') == 'mcp':
+                return False, "Scoped MCP tokens cannot be used as API tokens"
+
             access_key = payload.get('access_key', None)
-            
+
             if not access_key:
                 return False, f"Miss access_key payload error!"
             with Session(engine) as session:

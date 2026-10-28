@@ -14,6 +14,7 @@ import { formatTimestamp } from '@/utils/date'
 import { useClipboard } from '@vueuse/core'
 import EmptyBackground from '@/views/dashboard/common/EmptyBackground.vue'
 import { request } from '@/utils/request'
+import { datasourceApi } from '@/api/datasource'
 
 const { t } = useI18n()
 
@@ -94,6 +95,76 @@ const loadGridData = () => {
     state.tableData = res || []
   })
 }
+
+const mcpDialogVisible = ref(false)
+const mcpKey = ref<any>(null)
+const mcpDatasourceId = ref<number | null>(null)
+const mcpConfigText = ref('')
+const mcpConfigFileName = ref('sqlbot-mcp-config.json')
+const datasourceList = ref<any[]>([])
+const mcpLoading = ref(false)
+
+const openMcpDialog = async (row: any) => {
+  mcpKey.value = row
+  mcpDatasourceId.value = null
+  mcpConfigText.value = ''
+  mcpDialogVisible.value = true
+  if (!datasourceList.value.length) {
+    const res: any = await datasourceApi.list()
+    datasourceList.value = res || []
+  }
+}
+
+const loadMcpConfig = () => {
+  if (!mcpKey.value || !mcpDatasourceId.value) return
+  mcpConfigText.value = ''
+  mcpLoading.value = true
+  request
+    .get(`/system/apikey/${mcpKey.value.id}/mcp-config`, {
+      params: { datasource_id: mcpDatasourceId.value },
+    })
+    .then((res: any) => {
+      mcpConfigText.value = JSON.stringify(res.config, null, 2)
+      const name = String(res.datasource?.name || res.datasource?.id || 'config')
+      const safeName = name.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '')
+      mcpConfigFileName.value = `sqlbot-mcp-${safeName || 'config'}.json`
+    })
+    .catch(() => {
+      ElMessage.error(t('api_key.mcp_config_failed'))
+    })
+    .finally(() => {
+      mcpLoading.value = false
+    })
+}
+
+const copyMcpConfig = () => {
+  copy(mcpConfigText.value)
+    .then(() => {
+      ElMessage.success(t('embedded.copy_successful'))
+    })
+    .catch(() => {
+      ElMessage.error(t('embedded.copy_failed'))
+    })
+}
+
+const downloadMcpConfig = () => {
+  const blob = new Blob([mcpConfigText.value], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = mcpConfigFileName.value
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+const clearMcpDialog = () => {
+  mcpKey.value = null
+  mcpDatasourceId.value = null
+  mcpConfigText.value = ''
+}
+
 onMounted(() => {
   loadGridData()
 })
@@ -231,6 +302,19 @@ onMounted(() => {
           </template>
         </el-table-column>
 
+        <el-table-column width="90" label="MCP">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              :disabled="!scope.row.status"
+              @click="openMcpDialog(scope.row)"
+            >
+              MCP
+            </el-button>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="create_time" width="180" sortable :label="t('user.creation_time')">
           <template #default="scope">
             <span>{{ formatTimestamp(scope.row.create_time, 'YYYY-MM-DD HH:mm:ss') }}</span>
@@ -269,6 +353,56 @@ onMounted(() => {
         </template>
       </el-table>
     </div>
+
+    <el-dialog
+      v-model="mcpDialogVisible"
+      :title="t('api_key.mcp_config_title')"
+      width="680px"
+      destroy-on-close
+      @closed="clearMcpDialog"
+    >
+      <div class="mcp-config-body">
+        <div class="mcp-config-tip">{{ t('api_key.mcp_config_tip') }}</div>
+        <el-select
+          v-model="mcpDatasourceId"
+          :placeholder="t('api_key.mcp_select_datasource')"
+          filterable
+          style="width: 100%"
+          @change="loadMcpConfig"
+        >
+          <el-option
+            v-for="ds in datasourceList"
+            :key="ds.id"
+            :label="ds.name"
+            :value="ds.id"
+          />
+        </el-select>
+        <el-input
+          v-if="mcpConfigText"
+          v-model="mcpConfigText"
+          type="textarea"
+          :rows="14"
+          readonly
+          resize="none"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="mcpDialogVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button
+          :disabled="!mcpConfigText || mcpLoading"
+          @click="copyMcpConfig"
+        >
+          {{ t('api_key.mcp_config_copy') }}
+        </el-button>
+        <el-button
+          type="primary"
+          :disabled="!mcpConfigText || mcpLoading"
+          @click="downloadMcpConfig"
+        >
+          {{ t('api_key.mcp_config_download') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -376,6 +510,18 @@ onMounted(() => {
         margin-left: 12px;
       }
     }
+  }
+}
+
+.mcp-config-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .mcp-config-tip {
+    font-size: 13px;
+    line-height: 20px;
+    color: #646a73;
   }
 }
 </style>

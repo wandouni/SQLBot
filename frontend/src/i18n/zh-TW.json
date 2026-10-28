@@ -1040,6 +1040,12 @@
     "info_tips": "API Key 是您存取 SQLBot API 的密鑰，具有帳戶的完全權限，請您務必妥善保管！不要以任何方式公開 API Key 到外部渠道，避免被他人利用造成安全威脅。",
     "create": "建立",
     "to_doc": "檢視 API",
-    "trigger_limit": "最多支援建立 {0} 個 API Key"
+    "trigger_limit": "最多支援建立 {0} 個 API Key",
+    "mcp_config_title": "MCP 設定",
+    "mcp_config_tip": "匯出的設定僅能存取所選資料來源。其中包含憑證，請妥善保管。停用或刪除該 API Key 後立即失效。",
+    "mcp_select_datasource": "請選擇資料來源",
+    "mcp_config_copy": "複製設定",
+    "mcp_config_download": "下載 JSON",
+    "mcp_config_failed": "產生 MCP 設定失敗"
   }
 }

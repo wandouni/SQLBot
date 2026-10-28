@@ -1040,6 +1040,12 @@
     "info_tips": "API 키는 SQLBot API에 액세스하는 비밀키로 계정의 모든 권한을 갖고 있습니다. 꼭 안전하게 보관하세요! 외부 채널에 어떠한 방식으로도 API 키를 공개하지 마시고, 타인이 악용하여 보안 위협이 발생하는 것을 방지하세요.",
     "create": "생성",
     "to_doc": "API 보기",
-    "trigger_limit": "최대 {0}개의 API 키 생성 지원"
+    "trigger_limit": "최대 {0}개의 API 키 생성 지원",
+    "mcp_config_title": "MCP 구성",
+    "mcp_config_tip": "내보낸 구성은 선택한 데이터 소스에만 접근할 수 있습니다. 자격 증명이 포함되어 있으므로 안전하게 보관하세요. 이 API 키를 비활성화하거나 삭제하면 즉시 무효화됩니다.",
+    "mcp_select_datasource": "데이터 소스를 선택하세요",
+    "mcp_config_copy": "구성 복사",
+    "mcp_config_download": "JSON 다운로드",
+    "mcp_config_failed": "MCP 구성을 생성하지 못했습니다"
   }
 }

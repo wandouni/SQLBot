@@ -26,8 +26,12 @@ def get_user_by_account(*, session: Session, account: str) -> BaseUserDTO | None
     return BaseUserDTO.model_validate(db_user.model_dump())
 
 
-@cache(namespace=CacheNamespace.AUTH_INFO, cacheName=CacheName.USER_INFO, keyExpression="user_id")
-async def get_user_info(*, session: Session, user_id: int) -> UserInfoDTO | None:
+async def get_user_info_uncached(*, session: Session, user_id: int) -> UserInfoDTO | None:
+    """Read user state without the process-local auth cache.
+
+    Used by MCP authentication so disabling a user or removing a workspace
+    membership takes effect immediately on the separate MCP process.
+    """
     db_user: UserModel = get_db_user(session=session, user_id=user_id)
     if not db_user:
         return None
@@ -39,6 +43,11 @@ async def get_user_info(*, session: Session, user_id: int) -> UserInfoDTO | None
         select(UserWsModel).where(UserWsModel.uid == userInfo.id, UserWsModel.oid == userInfo.oid)).first()
     userInfo.weight = ws_model.weight if ws_model else -1
     return userInfo
+
+
+@cache(namespace=CacheNamespace.AUTH_INFO, cacheName=CacheName.USER_INFO, keyExpression="user_id")
+async def get_user_info(*, session: Session, user_id: int) -> UserInfoDTO | None:
+    return await get_user_info_uncached(session=session, user_id=user_id)
 
 
 def authenticate(*, session: Session, account: str, password: str) -> BaseUserDTO | None:

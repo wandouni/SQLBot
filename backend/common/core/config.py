@@ -112,6 +112,11 @@ class Settings(BaseSettings):
     MCP_IMAGE_HOST: str = 'http://localhost:3000'
     SERVER_IMAGE_HOST: str = 'http://YOUR_SERVE_IP:MCP_PORT/images/'
     SERVER_IMAGE_TIMEOUT: int = 15
+    # Public endpoint of the standalone MCP process (main:mcp_app).
+    # MCP_PUBLIC_URL is the full SSE URL, e.g. https://sqlbot.example.com/mcp.
+    # When unset, exported configs fall back to the request host and MCP_PORT.
+    MCP_PORT: int = 8001
+    MCP_PUBLIC_URL: str = ''
 
     LOCAL_MODEL_PATH: str = '/opt/sqlbot/models'
     DEFAULT_EMBEDDING_MODEL: str = 'shibing624/text2vec-base-chinese'

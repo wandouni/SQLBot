@@ -1,12 +1,21 @@
 
-from fastapi import APIRouter
+import re
+import secrets
+import time
+from urllib.parse import urlsplit
+
+import jwt
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from sqlmodel import func, select
+from apps.datasource.models.datasource import CoreDatasource
 from apps.system.crud.apikey_manage import clear_api_key_cache
 from apps.system.models.system_model import ApiKeyModel
 from apps.system.schemas.system_schema import ApikeyGridItem, ApikeyStatus
+from common.core import security
+from common.core.config import settings
 from common.core.deps import CurrentUser, SessionDep
 from common.utils.time import get_timestamp
-import secrets
 
 router = APIRouter(tags=["system_apikey"], prefix="/system/apikey", include_in_schema=False)
 from common.audit.models.log_model import OperationType, OperationModules
@@ -62,4 +71,80 @@ async def delete(session: SessionDep, current_user: CurrentUser, id: int):
     await clear_api_key_cache(api_key.access_key)
     session.delete(api_key)
     session.commit()
+
+
+def _mcp_public_url(request: Request) -> str:
+    configured = settings.MCP_PUBLIC_URL.strip().rstrip("/")
+    if configured:
+        parsed = urlsplit(configured)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("MCP_PUBLIC_URL must be an absolute http(s) URL")
+        if not parsed.path:
+            configured = f"{configured}/mcp"
+        return configured
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.url.hostname or "localhost"
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"{scheme}://{host}:{settings.MCP_PORT}/mcp"
+
+
+def _mcp_server_name(name: str, datasource_id: int) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", (name or "").strip()).strip("-._")
+    return f"sqlbot-{(slug or 'datasource')[:40]}-{datasource_id}"
+
+
+@router.get("/{id}/mcp-config")
+async def mcp_config(session: SessionDep, current_user: CurrentUser, request: Request,
+                     id: int, datasource_id: int):
+    """Export a scoped MCP config bound to one datasource.
+
+    The token is signed with this API key's secret and only works on the MCP
+    endpoint; disabling or deleting the key revokes it.
+    """
+    api_key = session.get(ApiKeyModel, id)
+    if not api_key:
+        raise ValueError("API Key not found")
+    if api_key.uid != current_user.id:
+        raise PermissionError("No permission to access this API Key")
+    if not api_key.status:
+        raise ValueError("API Key is disabled")
+
+    datasource = session.get(CoreDatasource, datasource_id)
+    if not datasource or int(datasource.oid) != int(current_user.oid):
+        raise PermissionError("Datasource does not belong to current workspace")
+
+    token = jwt.encode(
+        {
+            "access_key": api_key.access_key,
+            "scope": "mcp",
+            "uid": int(api_key.uid),
+            "oid": int(datasource.oid),
+            "datasource_id": int(datasource.id),
+            "iat": int(time.time()),
+        },
+        api_key.secret_key,
+        algorithm=security.ALGORITHM,
+    )
+
+    url = _mcp_public_url(request)
+    headers = {"Authorization": f"Bearer {token}"}
+    server_name = _mcp_server_name(datasource.name, int(datasource.id))
+    return JSONResponse(
+        content={
+            "url": url,
+            "headers": headers,
+            "datasource": {"id": int(datasource.id), "name": datasource.name},
+            "config": {
+                "mcpServers": {
+                    server_name: {
+                        "type": "sse",
+                        "url": url,
+                        "headers": headers,
+                    }
+                }
+            },
+        },
+        headers={"Cache-Control": "no-store"},
+    )
     

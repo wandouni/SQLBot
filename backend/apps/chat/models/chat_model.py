@@ -382,7 +382,7 @@ class ChatMcp(ChatQuestion):
 
 
 class McpDs(BaseModel):
-    token: str = Body(description='用户token')
+    token: Optional[str] = Body(description='用户token；使用 Authorization 头时可留空', default=None)
     oid: Optional[str] = Body(description='组织ID，如果不传则为最后一次登录SQLBot时所使用的组织ID', default=None)
 
 
@@ -409,11 +409,27 @@ class ChatQuestionBase(BaseModel):
 
 
 class McpQuestion(ChatQuestionBase):
-    token: str = Body(description='token')
+    token: Optional[str] = Body(description='token；使用 Authorization 头时可留空', default=None)
     stream: Optional[bool] = Body(description='是否流式输出，默认为true开启, 关闭false则返回JSON对象', default=True)
     lang: Optional[str] = Body(description='语言：zh-CN|zh-TW|en|ko-KR|th-TH', default='zh-CN')
     datasource_id: Optional[int | str] = Body(description='数据源ID，仅当当前对话没有确定数据源时有效', default=None)
     return_img: Optional[bool] = Body(description='是否返回图表，默认为true开启, 关闭false则仅返回数据', default=True)
+    custom_model: Optional[str | int] = Body(description='模型ID', default=None)
+
+
+class McpAsk(BaseModel):
+    """One-shot question used by native MCP clients.
+
+    ``chat_id`` is optional; when omitted a chat bound to ``datasource_id`` is
+    created. Scoped MCP tokens ignore ``chat_id``/``datasource_id`` outside
+    their exported scope and always answer non-streaming.
+    """
+    question: str = Body(description='用户提问')
+    chat_id: Optional[int] = Body(description='会话ID；为空时自动创建', default=None)
+    datasource_id: Optional[int] = Body(description='数据源ID；chat_id 为空时必填', default=None)
+    token: Optional[str] = Body(description='用户token；使用 Authorization 头时可留空', default=None)
+    lang: Optional[str] = Body(description='语言：zh-CN|zh-TW|en|ko-KR|th-TH', default='zh-CN')
+    return_img: Optional[bool] = Body(description='是否返回图表，默认关闭', default=False)
     custom_model: Optional[str | int] = Body(description='模型ID', default=None)
 
 

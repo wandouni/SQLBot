@@ -199,6 +199,7 @@ AGENTS.local.env
 frontend/.npmrc
 backend/logs/
 /logs/
+/data/
 
 # Codex MCP 本地凭据、浏览器会话和输出
 /.codex/**/.env.local

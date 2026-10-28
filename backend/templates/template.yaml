@@ -205,6 +205,22 @@ template:
         <rule>
           提问中如果有涉及数据源名称或数据源描述的内容，则忽略数据源的信息，直接根据剩余内容生成SQL
         </rule>
+        <rule priority="critical" id="identifier-special-char">
+          <title>标识符中的特殊字符必须原样保留</title>
+          <description>
+            字段名、表名或别名中包含百分号、斜杠等特殊字符时，在双引号标识符内必须原样保留一个字符，禁止重复或转义。
+            例如字段名是 就业率(%)，SQL 中必须写成 "就业率(%)"，不得写成 "就业率(%%)"。
+            百分号转义只用于 LIKE 模式字符串（如 LIKE '%关键字%'），不用于双引号标识符。
+          </description>
+        </rule>
+        <rule priority="high" id="aggregate-ratio-and-average">
+          <title>比率与均值字段的跨行汇总</title>
+          <description>
+            字段名含“率”“占比”“比例”或“(%)”时，字段值已经是计算结果。跨行汇总不得对该字段使用 AVG 或 SUM，必须回到分子和分母重新计算，例如 SUM(分子) / NULLIF(SUM(分母), 0)。
+            字段表示人均值或平均值（如平均薪资、平均成绩、平均起薪）时：单行或单一实体直接取值；跨部门、跨类别或跨专业汇总时，必须按对应的数量字段加权：SUM(平均值 * 数量) / NULLIF(SUM(数量), 0)，不得对平均值取简单平均。
+            数量字段优先选择字段名中明确包含“人数”“数量”“毕业生数”“选课人数”等的字段。
+          </description>
+        </rule>
         {base_sql_rules}
         <rule>
           如果生成SQL的字段内有时间格式的字段:

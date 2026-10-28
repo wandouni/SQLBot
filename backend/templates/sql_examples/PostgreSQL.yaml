@@ -21,6 +21,15 @@ template:
     <rule>函数字段必须加别名</rule>
     <rule>百分比字段保留两位小数并以%结尾</rule>
     <rule>避免与数据库关键字冲突</rule>
+    <rule priority="critical" id="postgres-numeric-cast">
+      <title>PostgreSQL 数值类型转换</title>
+      <description>
+        PostgreSQL 不支持 ROUND(double precision, integer)，且 double precision 参与除法时精度与类型都可能不符合预期。
+        凡对可能为 double precision 的字段、字段运算结果或聚合结果使用 ROUND、除法、百分比换算时，必须先转换为 numeric：
+        ROUND(expr::numeric, 2)、ROUND((expr)::numeric, 2)、SUM(a::numeric) / NULLIF(SUM(b), 0)、ROUND(SUM(a::numeric) / NULLIF(SUM(b), 0), 2)。
+        不要写成 ROUND(字段1 / 字段2 * 100, 2) 或 ROUND(SUM(字段), 2) 这类可能命中 double precision 的形式。
+      </description>
+    </rule>
 
   basic_example: |
     <basic-examples>
@@ -38,13 +47,14 @@ template:
           SELECT * FROM TEST.ORDERS LIMIT 100  -- 错误：未加引号、使用星号
           SELECT "订单ID", "金额" FROM "TEST"."ORDERS" "t1" LIMIT 100  -- 错误：缺少英文别名
           SELECT COUNT("订单ID") FROM "TEST"."ORDERS" "t1"  -- 错误：函数未加别名
+          SELECT ROUND("t1"."折扣率" * 100, 2) FROM "TEST"."ORDERS" "t1"  -- 错误：double precision 不支持 ROUND(double precision, integer)
         </output-bad>
         <output-good>
-          SELECT 
+          SELECT
             "t1"."订单ID" AS "order_id",
             "t1"."金额" AS "amount",
             COUNT("t1"."订单ID") AS "total_orders",
-            ROUND("t1"."折扣率" * 100, 2) || '%' AS "discount_percent"
+            ROUND(("t1"."折扣率" * 100)::numeric, 2) || '%' AS "discount_percent"
           FROM "TEST"."ORDERS" "t1"
           GROUP BY "t1"."订单ID", "t1"."金额", "t1"."折扣率"
           LIMIT 100
@@ -60,7 +70,7 @@ template:
         <output-good>
           SELECT
             "u"."user" AS "username",
-            ROUND("u"."active_ratio" * 100, 2) || '%' AS "active_percent"
+            ROUND(("u"."active_ratio" * 100)::numeric, 2) || '%' AS "active_percent"
           FROM "PUBLIC"."USERS" "u"
           WHERE "u"."status" = 1
         </output-good>

@@ -117,6 +117,11 @@ class Settings(BaseSettings):
     # When unset, exported configs fall back to the request host and MCP_PORT.
     MCP_PORT: int = 8001
     MCP_PUBLIC_URL: str = ''
+    # Internal endpoint used by the standalone MCP process to run API tools.
+    # Real HTTP keeps the MCP event loop free to emit SSE keepalives while a
+    # long query runs in the main API process.
+    MCP_API_BASE_URL: str = 'http://127.0.0.1:8000'
+    MCP_API_TIMEOUT_SEC: float = 300.0
 
     LOCAL_MODEL_PATH: str = '/opt/sqlbot/models'
     DEFAULT_EMBEDDING_MODEL: str = 'shibing624/text2vec-base-chinese'

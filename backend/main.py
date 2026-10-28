@@ -1,6 +1,7 @@
 import os
 from typing import Dict, Any
 
+import httpx
 import sqlbot_xpack
 from alembic.config import Config
 from fastapi import FastAPI, Request
@@ -13,7 +14,7 @@ from fastapi_mcp import FastApiMCP
 from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from alembic import command
 from apps.api import api_router
@@ -98,18 +99,30 @@ app = FastAPI(
 )
 
 
-class McpClientIpForwardMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        client_host = request.client.host if request.client else None
-        if client_host:
-            headers = MutableHeaders(scope=request.scope)
-            if not headers.get("x-real-ip"):
-                headers["x-real-ip"] = client_host
-            if not headers.get("x-forwarded-for"):
-                headers["x-forwarded-for"] = client_host
-            if not headers.get("x-client-ip"):
-                headers["x-client-ip"] = client_host
-        return await call_next(request)
+class McpClientIpForwardMiddleware:
+    """Inject client IP headers at the ASGI layer.
+
+    ``BaseHTTPMiddleware`` buffers the response body, which breaks the
+    long-lived MCP SSE stream (Starlette asserts on non-body messages). Keep
+    this middleware ASGI-native so streamed responses pass through untouched.
+    """
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] in ("http", "websocket"):
+            client = scope.get("client")
+            if client:
+                client_host = client[0]
+                headers = MutableHeaders(scope=scope)
+                if not headers.get("x-real-ip"):
+                    headers["x-real-ip"] = client_host
+                if not headers.get("x-forwarded-for"):
+                    headers["x-forwarded-for"] = client_host
+                if not headers.get("x-client-ip"):
+                    headers["x-client-ip"] = client_host
+        await self.app(scope, receive, send)
 
 # cache docs for different text
 _openapi_cache: Dict[str, Dict[str, Any]] = {}
@@ -214,13 +227,26 @@ images_path = settings.MCP_IMAGE_PATH
 os.makedirs(images_path, exist_ok=True)
 mcp_app.mount("/images", StaticFiles(directory=images_path), name="images")
 
+# Execute API tools over real HTTP against the main API process instead of
+# FastApiMCP's default in-process ASGITransport. The in-process transport runs
+# the query inside the MCP process's own event loop, so a long SQL query blocks
+# SSE keepalive pings and the client drops the session after its read timeout.
+mcp_api_client = httpx.AsyncClient(
+    base_url=settings.MCP_API_BASE_URL.rstrip("/"),
+    timeout=httpx.Timeout(settings.MCP_API_TIMEOUT_SEC, connect=10.0),
+)
+
 mcp = FastApiMCP(
     app,
     name="SQLBot MCP Server",
     description="SQLBot MCP Server",
     describe_all_responses=True,
     describe_full_response_schema=True,
-    include_operations=["mcp_datasource_list", "mcp_model_list", "mcp_question", "mcp_ask", "mcp_start", "mcp_assistant", "mcp_ws_list", "access_token"],
+    http_client=mcp_api_client,
+    # Expose only the one-shot question tool. The low-level list/start flow adds
+    # no value for a datasource-scoped token and makes LLM callers guess request
+    # bodies (producing recoverable 422s); mcp_ask accepts chat_id for follow-ups.
+    include_operations=["mcp_ask"],
     headers=["Authorization", "X-Forwarded-For", "X-Real-IP", "CF-Connecting-IP", "X-Client-IP"]
 )
 

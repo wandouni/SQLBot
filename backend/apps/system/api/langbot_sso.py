@@ -30,9 +30,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session
+from sqlmodel import Session, func, select
 
 from apps.system.crud.user import clean_user_cache
 from apps.system.models.system_model import UserWsModel
@@ -48,6 +47,7 @@ _MAX_BODY_BYTES = 8 * 1024
 _MAX_ACCOUNT_LENGTH = 100
 _NONCE_RE = re.compile(r"^[0-9a-fA-F]{16,64}$")
 _HEX64_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$")
 
 # Process-local one-time state. SqlBot must keep a single worker; restarting it
 # merely invalidates unredeemed tickets, and the user re-enters from LangBot.
@@ -163,6 +163,20 @@ def _ensure_membership(session: Session, uid: int, oid: int) -> None:
         session.flush()
 
 
+def _account_email(account: str) -> str:
+    """Return a stable non-empty email for a LangBot account.
+
+    ``UserInfoDTO`` requires ``email`` to be at least one character, so an
+    account provisioned without one cannot authenticate at all. LangBot
+    accounts already shaped like an address keep it; everything else gets a
+    deterministic placeholder derived from the account.
+    """
+    if len(account) <= 100 and _EMAIL_RE.fullmatch(account):
+        return account
+    digest = hashlib.sha256(account.encode()).hexdigest()[:16]
+    return f"langbot-{digest}@langbot.local"
+
+
 def _check_existing_user(user: UserModel) -> Optional[str]:
     if user.id == 1 or (user.account or "").strip().lower() == "admin":
         return _ERROR_ACCOUNT_REJECTED
@@ -171,6 +185,21 @@ def _check_existing_user(user: UserModel) -> Optional[str]:
     if user.origin is not None and user.origin != 0:
         return _ERROR_ACCOUNT_REJECTED
     return None
+
+
+def _repair_existing_user(session: Session, user: UserModel, account: str, workspace_id: int) -> None:
+    """Fill in fields older SSO runs left empty, then ensure membership."""
+    repaired = False
+    if user.oid in (None, 0):
+        user.oid = workspace_id
+        repaired = True
+    if not (user.email or "").strip():
+        user.email = _account_email(account)
+        repaired = True
+    if repaired:
+        session.add(user)
+    _ensure_membership(session, user.id, user.oid)
+    session.flush()
 
 
 def _resolve_or_create_user(session: Session, account: str) -> tuple[Optional[UserModel], str]:
@@ -182,11 +211,7 @@ def _resolve_or_create_user(session: Session, account: str) -> tuple[Optional[Us
         rejection = _check_existing_user(user)
         if rejection is not None:
             return None, rejection
-        if user.oid in (None, 0):
-            user.oid = workspace_id
-            session.add(user)
-        _ensure_membership(session, user.id, user.oid)
-        session.flush()
+        _repair_existing_user(session, user, account, workspace_id)
         return user, ""
 
     user = UserModel(
@@ -194,7 +219,7 @@ def _resolve_or_create_user(session: Session, account: str) -> tuple[Optional[Us
         name=account,
         oid=workspace_id,
         password=md5pwd(secrets.token_urlsafe(32)),
-        email="",
+        email=_account_email(account),
         status=1,
         origin=0,
         language="zh-CN",
@@ -212,11 +237,7 @@ def _resolve_or_create_user(session: Session, account: str) -> tuple[Optional[Us
         rejection = _check_existing_user(user)
         if rejection is not None:
             return None, rejection
-        if user.oid in (None, 0):
-            user.oid = workspace_id
-            session.add(user)
-        _ensure_membership(session, user.id, user.oid)
-        session.flush()
+        _repair_existing_user(session, user, account, workspace_id)
         return user, ""
 
     _ensure_membership(session, user.id, workspace_id)

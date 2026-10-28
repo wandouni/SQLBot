@@ -155,6 +155,7 @@ def _user(**overrides):
         "id": 42,
         "account": "zhangsan",
         "name": "zhangsan",
+        "email": "zhangsan@example.com",
         "oid": 1,
         "status": 1,
         "origin": 0,
@@ -278,6 +279,69 @@ class AccountTest(unittest.TestCase):
         self.assertEqual(1, user.status)
         self.assertEqual(0, user.origin)
         self.assertEqual(32, len(user.password))
+        self.assertTrue(user.email)
+        self.assertLessEqual(len(user.email), 100)
+
+    def test_created_user_satisfies_user_info_dto(self) -> None:
+        """``/user/info`` validates through ``UserInfoDTO``; email must not be empty."""
+
+        from apps.system.schemas.system_schema import UserInfoDTO
+
+        session = _FakeSession()
+        with (
+            patch.object(langbot_sso, "_find_user", return_value=None),
+            patch.object(settings, "LANGBOT_SSO_DEFAULT_WORKSPACE_ID", 1),
+        ):
+            user, _ = langbot_sso._resolve_or_create_user(session, "张三")
+
+        info = UserInfoDTO.model_validate(
+            {
+                "id": 42,
+                "account": user.account,
+                "name": user.name,
+                "email": user.email,
+                "status": user.status,
+                "origin": user.origin,
+                "oid": user.oid,
+            }
+        )
+        self.assertEqual("张三", info.account)
+
+    def test_account_email_prefers_a_real_address(self) -> None:
+        self.assertEqual("tester@example.com", langbot_sso._account_email("tester@example.com"))
+        self.assertEqual(
+            langbot_sso._account_email("张三"),
+            langbot_sso._account_email("张三"),
+        )
+        self.assertNotEqual(
+            langbot_sso._account_email("张三"),
+            langbot_sso._account_email("李四"),
+        )
+
+    def test_existing_user_without_email_is_repaired(self) -> None:
+        user = _user(email="")
+        session = _FakeSession(membership=None)
+        with (
+            patch.object(langbot_sso, "_find_user", return_value=user),
+            patch.object(settings, "LANGBOT_SSO_DEFAULT_WORKSPACE_ID", 1),
+        ):
+            resolved, rejection = langbot_sso._resolve_or_create_user(session, "zhangsan")
+
+        self.assertEqual("", rejection)
+        self.assertIs(resolved, user)
+        self.assertTrue(user.email)
+        self.assertIn(user, session.added)
+
+    def test_existing_user_email_is_preserved(self) -> None:
+        user = _user(email="kept@example.com")
+        session = _FakeSession(membership=None)
+        with (
+            patch.object(langbot_sso, "_find_user", return_value=user),
+            patch.object(settings, "LANGBOT_SSO_DEFAULT_WORKSPACE_ID", 1),
+        ):
+            langbot_sso._resolve_or_create_user(session, "zhangsan")
+
+        self.assertEqual("kept@example.com", user.email)
 
 
 class TicketEndpointTest(unittest.IsolatedAsyncioTestCase):

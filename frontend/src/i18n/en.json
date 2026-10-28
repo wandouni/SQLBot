@@ -994,7 +994,10 @@
     "redirect_immediately": "Redirecting immediately",
     "permission_invalid": "Authentication invalid [Current account has insufficient permissions]",
     "scan_qr_login": " Scan QR Code",
-    "no_auth_error": "Not authenticated. Redirecting to login page in {0} seconds..."
+    "no_auth_error": "Not authenticated. Redirecting to login page in {0} seconds...",
+    "sso_processing": "Signing in...",
+    "sso_failed": "Single sign-on failed. Please sign in again or return to the application center.",
+    "back_to_portal": "Back to application center"
   },
   "supplier": {
     "alibaba_cloud_bailian": "Alibaba Cloud Bailian",

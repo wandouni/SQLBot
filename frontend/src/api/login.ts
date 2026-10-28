@@ -24,4 +24,16 @@ export const AuthApi = {
   },
   logout: (data: any) => request.post('/login/logout', data),
   info: () => request.get('/user/info'),
+  ssoExchange: (ticket: string) =>
+    request.post<{
+      access_token: string
+      token_type: string
+      platform_info: any
+      need_change_pwd: boolean
+    }>(
+      '/system/langbot/sso/exchange',
+      { ticket },
+      // A stale ticket must not trigger the global 401 redirect/notification.
+      { requestOptions: { customError: true, silent: true } }
+    ),
 }

@@ -78,6 +78,20 @@ class Settings(BaseSettings):
     
     SQLBOT_DOC_ENABLED: bool = True
 
+    # ---- LangBot application-center single sign-on ----
+    # LangBot signs a server-to-server request with LANGBOT_SSO_SHARED_SECRET and
+    # receives a one-time ticket. The browser redeems it together with an
+    # HttpOnly binding cookie. Keep the service disabled unless the shared
+    # secret is configured on both sides.
+    LANGBOT_SSO_ENABLED: bool = False
+    LANGBOT_SSO_SHARED_SECRET: str = ''
+    LANGBOT_SSO_TICKET_TTL_SECONDS: int = 60
+    LANGBOT_SSO_CLOCK_SKEW_SECONDS: int = 60
+    LANGBOT_SSO_NONCE_TTL_SECONDS: int = 120
+    LANGBOT_SSO_TOKEN_TTL_MINUTES: int = 60 * 8
+    LANGBOT_SSO_DEFAULT_WORKSPACE_ID: int = 1
+    LANGBOT_SSO_BINDING_COOKIE_NAME: str = 'sqlbot_sso_bind'
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn | str:

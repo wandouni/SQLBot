@@ -2,7 +2,7 @@
   <div
     v-if="showLoading"
     v-loading="true"
-    :element-loading-text="t('qa.loading')"
+    :element-loading-text="ssoPending ? t('login.sso_processing') : t('qa.loading')"
     class="xpack-login-handler-mask"
     element-loading-background="#F5F6F7"
   ></div>
@@ -32,6 +32,12 @@
         </div>
         <div v-else class="welcome" style="height: 0"></div>
         <div class="login-form">
+          <div v-if="ssoFailed" class="sso-error" role="alert">
+            <span>{{ t('login.sso_failed') }}</span>
+            <el-button link type="primary" @click="backToPortal">{{
+              t('login.back_to_portal')
+            }}</el-button>
+          </div>
           <div class="default-login-tabs">
             <h2 class="title">{{ $t('common.login') }}</h2>
             <el-form
@@ -67,7 +73,9 @@
             </el-form>
           </div>
           <Handler
+            v-if="ssoReady"
             v-model:loading="showLoading"
+            :skip-auto-login="ssoSkipAutoLogin"
             jsname="L2NvbXBvbmVudC9sb2dpbi9IYW5kbGVy"
             @switch-tab="switchTab"
           />
@@ -85,8 +93,9 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { AuthApi } from '@/api/login'
 import { useI18n } from 'vue-i18n'
 import custom_small from '@/assets/svg/logo-custom_small.svg'
 import LOGO_fold from '@/assets/LOGO-fold.svg'
@@ -100,7 +109,13 @@ import elementResizeDetectorMaker from 'element-resize-detector'
 
 const showLoading = ref(true)
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
+const ssoTicket = typeof route.query.sso_ticket === 'string' ? route.query.sso_ticket : ''
+const ssoPending = ref(Boolean(ssoTicket))
+const ssoReady = ref(!ssoTicket)
+const ssoSkipAutoLogin = ref(false)
+const ssoFailed = ref(false)
 const appearanceStore = useAppearanceStoreWithOut()
 const { t } = useI18n()
 const loginForm = ref({
@@ -123,6 +138,39 @@ const showLoginImage = computed<boolean>(() => {
   return !(loginContainerWidth.value < 889)
 })
 
+const backToPortal = () => {
+  window.location.href = '/portal'
+}
+
+/**
+ * Exchanges a one-time ticket issued by LangBot for a SqlBot session.
+ *
+ * The ticket is stripped from the hash before the request so a refresh cannot
+ * replay it, and a failure falls back to the normal login form instead of the
+ * X-Pack auto-login redirects.
+ */
+const exchangeSsoTicket = async (ticket: string) => {
+  try {
+    await router.replace({ path: '/login' })
+    userStore.clear()
+    const res = await AuthApi.ssoExchange(ticket)
+    if (!res?.access_token) {
+      throw new Error('missing access token')
+    }
+    userStore.setToken(res.access_token)
+    toLoginSuccess(router)
+  } catch {
+    ssoFailed.value = true
+    ssoSkipAutoLogin.value = true
+    ssoReady.value = true
+  } finally {
+    ssoPending.value = false
+    if (ssoReady.value) {
+      showLoading.value = false
+    }
+  }
+}
+
 onMounted(async () => {
   const erd = elementResizeDetectorMaker()
   erd.listenTo(loginContainer.value, () => {
@@ -130,6 +178,9 @@ onMounted(async () => {
       loginContainerWidth.value = loginContainer.value?.offsetWidth
     })
   })
+  if (ssoTicket) {
+    await exchangeSsoTicket(ssoTicket)
+  }
 })
 const rules = {
   username: [{ required: true, message: t('common.your_account_email_address'), trigger: 'blur' }],
@@ -224,6 +275,21 @@ const switchTab = (name: string) => {
               margin-bottom: 48px;
             }
           }
+        }
+
+        .sso-error {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 16px;
+          padding: 10px 12px;
+          border: 1px solid #f56c6c;
+          border-radius: 6px;
+          background: #fef0f0;
+          color: #f56c6c;
+          font-size: 13px;
+          line-height: 20px;
         }
 
         .title {

@@ -68,8 +68,11 @@ import { loadClient, origin_mapping, type LoginCategory } from './PlatformClient
 
 import { useI18n } from 'vue-i18n'
 const isLdap = ref(false)
-defineProps<{
+const props = defineProps<{
   loading: boolean
+  // Set when the page already handled a LangBot SSO ticket and must not be
+  // hijacked by the configured default third-party login.
+  skipAutoLogin?: boolean
 }>()
 const emits = defineEmits(['switchTab', 'autoCallback', 'update:loading'])
 const updateLoading = (show: boolean, time: number = 1000) => {
@@ -406,6 +409,10 @@ const auto2Platform = async () => {
 }
 
 onMounted(() => {
+  if (props.skipAutoLogin) {
+    emits('update:loading', false)
+    return
+  }
   if (adminLogin.value) {
     updateLoading(false, 100)
     return

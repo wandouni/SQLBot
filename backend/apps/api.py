@@ -5,7 +5,7 @@ from apps.dashboard.api import dashboard_api
 from apps.data_training.api import data_training
 from apps.datasource.api import datasource, table_relation, recommended_problem
 from apps.mcp import mcp
-from apps.system.api import login, user, aimodel, workspace, assistant, parameter, apikey, variable_api
+from apps.system.api import login, user, aimodel, workspace, assistant, parameter, apikey, variable_api, langbot_sso
 from apps.terminology.api import terminology
 from apps.settings.api import base
 #from audit.api import audit_api
@@ -31,5 +31,6 @@ api_router.include_router(apikey.router)
 api_router.include_router(recommended_problem.router)
 
 api_router.include_router(variable_api.router)
+api_router.include_router(langbot_sso.router)
 
 #api_router.include_router(audit_api.router)

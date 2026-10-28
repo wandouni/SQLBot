@@ -994,7 +994,10 @@
     "redirect_immediately": "立即跳转",
     "permission_invalid": "认证无效【当前账号权限不够】",
     "scan_qr_login": "扫码登录",
-    "no_auth_error": "未认证，即将跳转登录页面，{0} 秒..."
+    "no_auth_error": "未认证，即将跳转登录页面，{0} 秒...",
+    "sso_processing": "正在登录...",
+    "sso_failed": "单点登录失败，请重新登录或返回应用中心",
+    "back_to_portal": "返回应用中心"
   },
   "supplier": {
     "alibaba_cloud_bailian": "阿里云百炼",

@@ -994,7 +994,10 @@
     "redirect_immediately": "지금 이동",
     "permission_invalid": "인증 무효 [현재 계정의 권한이 부족합니다]",
     "scan_qr_login": " QR 코드 스캔",
-    "no_auth_error": "인증되지 않았습니다. {0}초 후 로그인 페이지로 이동합니다..."
+    "no_auth_error": "인증되지 않았습니다. {0}초 후 로그인 페이지로 이동합니다...",
+    "sso_processing": "로그인 중...",
+    "sso_failed": "Single sign-on에 실패했습니다. 다시 로그인하거나 애플리케이션 센터로 돌아가세요.",
+    "back_to_portal": "애플리케이션 센터로 돌아가기"
   },
   "supplier": {
     "alibaba_cloud_bailian": "알리바바 클라우드 바이리엔",

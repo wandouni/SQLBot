@@ -38,7 +38,10 @@ wlist = [
     "/system/authentication/sso/*",
     "/system/platform/sso/*",
     "/system/platform/client/*",
-    "/system/parameter/login"
+    "/system/parameter/login",
+    # LangBot application-center SSO: both endpoints run before a SqlBot token
+    # exists. The ticket endpoint additionally verifies an HMAC signature.
+    "/system/langbot/sso/*"
 ]
 
 class WhitelistChecker:
